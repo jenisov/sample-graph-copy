@@ -9,57 +9,57 @@ using std::unordered_map;
 using std::cout;
 using std::mt19937;
 
-template<class T>
-class list;
-
 class graph;
 
-template<class T>
-class list_node {
+class graph_node {
 private:
-    friend class list<T>;
     friend class graph;
 
-    list_node<T> *m_next;
-    T m_data;
+    graph_node *m_next;
+    graph_node *m_link;
+
+    size_t m_data;
 
 public:
-    list_node() : m_data(), m_next(nullptr) {}
+    graph_node() : m_next(nullptr), m_link(nullptr), m_data(0) {}
 
-    ~list_node() = default;
+    ~graph_node() = default;
+
+    void bind(graph_node *link) {
+        this->m_link = link;
+    }
 };
 
-template<class T>
-class list {
+class graph {
 public:
     class iterator;
-protected:
+private:
     size_t m_size;
 
-    list_node<T> *m_head;
-    list_node<T> *m_end;
+    graph_node *m_head;
+    graph_node *m_end;
 
 public:
     class iterator {
     private:
-        list_node<T> *m_ptr;
+        graph_node *m_ptr;
 
     public:
         iterator() : m_ptr(nullptr) {}
 
-        explicit iterator(list_node<T> *ptr) : m_ptr(ptr) {}
+        explicit iterator(graph_node *ptr) : m_ptr(ptr) {}
 
         ~iterator() = default;
 
-        T& operator*() const {
+        size_t& operator*() const {
             return this->m_ptr->m_data;
         }
 
-        const list_node<T>* operator->() const {
+        graph_node *operator->() const {
             return this->m_ptr;
         }
 
-        const list<T>::iterator& operator++() {
+        const graph::iterator& operator++() {
             if (!this->m_ptr) {
                 throw std::exception("Iterator not incrementable.");
             }
@@ -67,18 +67,18 @@ public:
             return *this;
         }
 
-        const list<T>::iterator operator++(int) {
-            list<T>::iterator old;
+        const graph::iterator operator++(int) {
+            graph::iterator old;
             old.m_ptr = this->m_ptr;
             this->m_ptr = this->m_ptr->m_next;
             return old;
         }
 
-        bool operator==(const list<T>::iterator &right) {
+        bool operator==(const graph::iterator &right) {
             return this->m_ptr == right.m_ptr;
         }
 
-        bool operator!=(const list<T>::iterator &right) {
+        bool operator!=(const graph::iterator &right) {
             return this->m_ptr != right.m_ptr;
         }
 
@@ -87,92 +87,22 @@ public:
         }
     };
 
-    list() : m_head(nullptr), m_end(nullptr), m_size(0) {};
+    graph() : m_head(nullptr), m_end(nullptr), m_size(0) {}
 
-    ~list() {
-        this->clear();
-    }
+    graph(const graph& right) : m_head(nullptr), m_end(nullptr), m_size(0) {
+        std::unordered_map<graph_node*, graph_node*> vec;
 
-    void push_back(const T& arg) {
-        if (!this->m_head) {
-            this->m_head = new list_node<T>;
-            this->m_head->m_data = arg;
-            ++this->m_size;
-            this->m_end = this->m_head;
-            return;
-        }
-        this->m_end->m_next = new list_node<T>;
-        this->m_end->m_next->m_data = arg;
-        this->m_end = this->m_end->m_next;
-        ++this->m_size;
-    }
-
-    T& operator[] (const int& pos) const {
-        assert(pos > -1 && pos < this->m_size);
-        list_node<T> *ptr = this->m_head;
-        for (int i = 0; i < pos; i++) {
-            ptr = ptr->m_next;
-        }
-
-        return ptr->m_data;
-    }
-
-    void clear() {
-        if (!this->m_head) {
-            return;
-        }
-        list_node<T> *ptr = this->m_head;
-        list_node<T> *next;
-        while (ptr) {
-            next = ptr->m_next;
-            delete[] ptr;
-            ptr = next;
-        }
-        this->m_head = nullptr;
-        this->m_size = 0;
-    }
-
-    list<T>::iterator begin() {
-        return list<T>::iterator(this->m_head);
-    }
-
-    list<T>::iterator end() {
-        return list<T>::iterator(nullptr);
-    }
-
-    list<T>::iterator pre_end() {
-        return list<T>::iterator(this->m_end);
-    }
-
-    friend std::ostream& operator<< (std::ostream& out, const list<T>& l) {
-        list_node<T> *current = l.m_head;
-        for (current; current; current = current->m_next) {
-            out << current->m_data << " ";
-        }
-        return out;
-    }
-};
-
-class graph final : public list<void*> {
-public:
-    graph() : list<void*>() {}
-
-    // копирование за два прохода (исходного и результирующего списков)
-    graph(const graph& right) {
-        std::unordered_map<void*, void*> vec;
-
-        this->clear();
         int i = 0;
         for (auto ptr = right.m_head; ptr; ptr = ptr->m_next, i++) {
-            this->push_back(ptr->m_data);
+            this->push_back(ptr->m_data, ptr->m_link);
             vec.emplace(ptr, this->m_end);
         }
 
         for (auto ptr = this->m_head; ptr; ptr = ptr->m_next) {
-            if (!ptr->m_data) {
+            if (!ptr->m_link) {
                 continue;
             }
-            ptr->m_data = vec[ptr->m_data];
+            ptr->m_link = vec[ptr->m_link];
         }
     }
 
@@ -210,7 +140,55 @@ public:
         }
     }*/
 
-    ~graph() = default;
+    ~graph() {
+        this->clear();
+    }
+
+    void clear() {
+        if (!this->m_head) {
+            this->m_end = nullptr;
+            this->m_size = 0;
+            return;
+        }
+        graph_node *ptr = this->m_head;
+        graph_node *next;
+        while (ptr) {
+            next = ptr->m_next;
+            delete[] ptr;
+            ptr = next;
+        }
+        this->m_head = nullptr;
+        this->m_end = nullptr;
+        this->m_size = 0;
+    }
+
+    void push_back(const size_t& val, graph_node *link = nullptr) {
+        if (!this->m_head) {
+            this->m_head = new graph_node;
+            this->m_head->m_data = val;
+            this->m_head->m_link = link;
+            ++this->m_size;
+            this->m_end = this->m_head;
+            return;
+        }
+        this->m_end->m_next = new graph_node;
+        this->m_end->m_next->m_data = val;
+        this->m_end->m_next->m_link = link;
+        this->m_end = this->m_end->m_next;
+        ++this->m_size;
+    }
+
+    graph::iterator begin() {
+        return graph::iterator(this->m_head);
+    }
+
+    graph::iterator end() {
+        return graph::iterator(nullptr);
+    }
+
+    graph::iterator pre_end() {
+        return graph::iterator(this->m_end);
+    }
 
     void print() {
         unordered_map<void*, int> vec;
@@ -220,7 +198,7 @@ public:
         }
         i = 1;
         for (auto ptr = this->m_head; ptr; ptr = ptr->m_next) {
-            std::cout << i++ << " -> " << vec[ptr->m_data] << "\n";
+            std::cout << i++ << " -> " << vec[ptr->m_link] << "\n";
             if (ptr->m_next) {
                 cout << "|\n";
             }
@@ -228,21 +206,18 @@ public:
     }
 };
 
-int main()
-{
+int main() {
     graph lst;
     mt19937 rg;
-    void* vec[LIST_SIZE];
+    graph_node* vec[LIST_SIZE];
     for (auto &i : vec) {
         lst.push_back(0);
-        i = (void*)lst.pre_end().operator->();
+        i = lst.pre_end().operator->();
     }
 
-    for (auto &el : lst) {
-        el = vec[rg() % LIST_SIZE];
+    for (auto it = lst.begin(); it != lst.end(); it++) {
+        it->bind(vec[rg() % LIST_SIZE]);
     }
-
-    lst[rg() % LIST_SIZE] = 0;
 
     graph lst1(lst);
 
