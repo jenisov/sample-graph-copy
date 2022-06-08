@@ -202,6 +202,9 @@ private:
             this->recursive_copy(head);
         }
         // переопределяем линк узла графа
+        if (!current_ptr->m_link) {
+            return;
+        }
         current_ptr->m_link = vec[current_ptr->m_link];
     }
 };
@@ -221,6 +224,8 @@ int main() {
     for (auto it = lst.begin(); it != lst.end(); it++) {
         it->bind(vec[rg() % LIST_SIZE]);
     }
+    // тест на пустой линк
+    lst.begin()->bind(nullptr);
     cout << "\n";
 
     graph lst1;
